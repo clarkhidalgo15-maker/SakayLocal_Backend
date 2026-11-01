@@ -82,6 +82,13 @@ class Database {
     private $columns;
 
     /**
+     * Whether the current SELECT should return distinct rows
+     *
+     * @var boolean
+     */
+    private $distinct = false;
+
+    /**
      * SQL Statement
      *
      * @var string
@@ -293,6 +300,17 @@ class Database {
         self::$instance = new Database($dbname);
         return self::$instance;
     }
+
+    /**
+     * Expose the configured PDO connection for legacy controller integrations.
+     * New code should prefer the query builder methods on this class.
+     *
+     * @return PDO
+     */
+    public function connection()
+    {
+        return $this->db;
+    }
     
     /**
      * Validate SQL identifier (table or column name)
@@ -455,6 +473,7 @@ class Database {
     {
         $this->table          = NULL;
         $this->columns        = NULL;
+        $this->distinct      = false;
         $this->sql            = NULL;
         $this->bind_values    = array();
         $this->limit          = NULL;
@@ -669,6 +688,33 @@ class Database {
         $columns = implode(', ', $columns);
 
         $this->columns = "{$columns}";
+        return $this;
+    }
+
+    /**
+     * Add a trusted SQL expression to the selected columns
+     *
+     * @param string $expression
+     * @return object
+     */
+    public function select_raw($expression)
+    {
+        $this->columns = is_null($this->columns)
+            ? $expression
+            : $this->columns . ', ' . $expression;
+
+        return $this;
+    }
+
+    /**
+     * Return distinct rows
+     *
+     * @return object
+     */
+    public function distinct()
+    {
+        $this->distinct = true;
+
         return $this;
     }
 
@@ -1275,7 +1321,9 @@ class Database {
         $field_name = trim($field_name);
         $this->validate_identifier($field_name);
 
-        $this->order_by = ' ORDER BY ';
+        $this->order_by = is_null($this->order_by)
+            ? ' ORDER BY '
+            : $this->order_by . ', ';
         if (! is_null($order)) {
             $this->order_by .= $field_name . ' ' . strtoupper($order);
         } else {
@@ -1352,7 +1400,7 @@ class Database {
     {
         $select = ($this->columns !== NULL) ? $this->columns : '*';
 
-        $this->sql = "SELECT $select FROM {$this->table}";
+        $this->sql = 'SELECT ' . ($this->distinct ? 'DISTINCT ' : '') . "$select FROM {$this->table}";
 
         if ($this->join !== NULL) {
             $this->sql .= $this->join;

@@ -1,0 +1,92 @@
+<?php
+defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
+
+require_once __DIR__ . '/ApiController.php';
+
+class AccountController extends ApiController
+{
+    public function account()
+    {
+        $user = $this->requireAuthenticatedUser();
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            unset($user['password_hash']);
+            $this->respond(['data' => $user]);
+        }
+
+        $this->apiLibrary()->require_method('POST');
+        $input = array_merge($_POST, $this->input());
+        $fullName = $this->text($input['full_name'] ?? '', 'Full name', 150);
+        $email = strtolower($this->text($input['email'] ?? '', 'Email', 255));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->respond(['error' => 'A valid email is required.'], 422);
+        }
+        $phone = $this->text($input['phone'] ?? '', 'Phone', 30, false);
+        $profilePhoto = null;
+        if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $profilePhoto = $this->saveProfilePhoto($_FILES['profile_photo']);
+        }
+
+        $data = [
+            'full_name' => $fullName,
+            'email' => $email,
+            'phone' => $phone,
+            'notify_advisories' => filter_var($input['notify_advisories'] ?? '0', FILTER_VALIDATE_BOOLEAN),
+            'notify_weather' => filter_var($input['notify_weather'] ?? '0', FILTER_VALIDATE_BOOLEAN),
+        ];
+        if ($profilePhoto !== null) {
+            $data['profile_photo'] = $profilePhoto;
+        }
+        try {
+            $this->User_model->updateProfile($user['user_id'], $data);
+        } catch (PDOException $exception) {
+            if ($profilePhoto !== null) {
+                @unlink(ROOT_DIR . 'public' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $profilePhoto));
+            }
+            if ($exception->getCode() === '23000') {
+                $this->respond(['error' => 'That email address is already in use.'], 409);
+            }
+            throw $exception;
+        }
+        if ($profilePhoto !== null && !empty($user['profile_photo']) && $user['profile_photo'] !== $profilePhoto
+            && preg_match('~\Auploads/profiles/[a-f0-9]{32}\.(?:jpg|png|webp)\z~', $user['profile_photo'])) {
+            $oldPhotoPath = ROOT_DIR . 'public' . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $user['profile_photo']);
+            if (is_file($oldPhotoPath) && !unlink($oldPhotoPath)) {
+                error_log('Could not remove a replaced SakayLokal profile photo.');
+            }
+        }
+        $updated = $this->User_model->findActiveById($user['user_id']);
+        unset($updated['password_hash']);
+        $this->respond(['data' => $updated]);
+    }
+
+    public function reports()
+    {
+        $user = $this->requireAuthenticatedUser();
+        $this->apiLibrary()->require_method('GET');
+        $this->call->model('Passenger_report_model');
+        $this->respond(['data' => $this->Passenger_report_model->getForUser($user['user_id'])]);
+    }
+
+    private function saveProfilePhoto(array $upload)
+    {
+        if ($upload['error'] !== UPLOAD_ERR_OK || $upload['size'] > 2 * 1024 * 1024) {
+            $this->respond(['error' => 'Profile photos must be valid images no larger than 2 MB.'], 422);
+        }
+        $image = @getimagesize($upload['tmp_name']);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
+        $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        if (!$image || $image[0] > 4096 || $image[1] > 4096 || !isset($extensions[$mime])) {
+            $this->respond(['error' => 'Upload a JPEG, PNG, or WebP profile photo.'], 422);
+        }
+        $directory = ROOT_DIR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'profiles' . DIRECTORY_SEPARATOR;
+        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+            throw new RuntimeException('Could not create the profile-photo upload directory.');
+        }
+        $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
+        if (!move_uploaded_file($upload['tmp_name'], $directory . $filename)) {
+            throw new RuntimeException('Could not store the uploaded profile photo.');
+        }
+        return 'uploads/profiles/' . $filename;
+    }
+}
