@@ -56,7 +56,35 @@ class AuthController extends ApiController
             } catch (PDOException $exception) {
                 $this->respond(['error' => 'That email is already registered.'], 409);
             }
+
+            try {
+                $this->sendWelcomeEmail($email, $fullName);
+            } catch (Throwable $exception) {
+                error_log('SakayLokal welcome email failed for ' . $email . ': ' . $exception->getMessage());
+            }
+
             $this->respond(['data' => ['id' => $id, 'message' => 'Account created.']], 201);
+        }
+
+        private function sendWelcomeEmail($email, $fullName)
+        {
+            $host = getenv('SMTP_HOST') ?: '';
+            $username = getenv('SMTP_USERNAME') ?: '';
+            $password = getenv('SMTP_PASSWORD') ?: '';
+
+            if ($host === '' || $username === '' || $password === '') {
+                return;
+            }
+
+            $this->call->library('Smtp_mailer');
+            $subject = 'Welcome to SakayLokal';
+            $safeName = htmlspecialchars($fullName ?: 'Passenger', ENT_QUOTES, 'UTF-8');
+            $message = "<p>Hi {$safeName},</p>"
+                . "<p>Welcome to SakayLokal! Your passenger account has been created successfully.</p>"
+                . "<p>You can now log in to find terminals, routes, fares, and submit reports.</p>"
+                . "<p>Thank you for joining the SakayLokal community.</p>";
+
+            $this->Smtp_mailer->send($email, $subject, $message);
         }
 
 }
