@@ -84,17 +84,14 @@ if ($composer_autoload = config_item('composer_autoload'))
 {
 	if ($composer_autoload === TRUE)
 	{
-		file_exists(ROOT_DIR.'vendor/autoload.php')
-			? require_once(ROOT_DIR.'vendor/autoload.php')
-			: show_404('404 Not Found', 'Composer config file not found.');
+		if (file_exists(ROOT_DIR.'vendor/autoload.php'))
+		{
+			require_once(ROOT_DIR.'vendor/autoload.php');
+		}
 	}
 	elseif (file_exists($composer_autoload))
 	{
 		require_once($composer_autoload);
-	}
-	else
-	{
-		show_404('404 Not Found', 'Composer config file not found.');
 	}
 }
 
