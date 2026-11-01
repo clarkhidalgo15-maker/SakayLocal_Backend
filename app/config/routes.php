@@ -45,6 +45,7 @@ defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 /** @var object $router **/
 
 $router->get('/', 'Welcome::index');
+$router->get('/api', 'PublicApiController::index');
 $router->get('/api/health', 'PublicApiController::health');
 $router->options('/api/auth/login', 'ApiController::cors');
 $router->options('/api/reports', 'ApiController::cors');

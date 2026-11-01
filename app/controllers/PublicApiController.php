@@ -5,6 +5,14 @@ require_once __DIR__ . '/ApiController.php';
 
 class PublicApiController extends ApiController
 {
+    public function index()
+    {
+        $this->respond([
+            'status' => 'ok',
+            'message' => 'LavaLust API is running.'
+        ]);
+    }
+
     public function health()
         {
             $this->respond(['ok' => true, 'service' => 'SakayLokal API']);
