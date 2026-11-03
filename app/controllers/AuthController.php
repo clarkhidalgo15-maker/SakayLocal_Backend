@@ -57,25 +57,25 @@ class AuthController extends ApiController
                 $this->respond(['error' => 'That email is already registered.'], 409);
             }
 
+            $emailSent = false;
             try {
                 $this->sendWelcomeEmail($email, $fullName);
+                $emailSent = true;
             } catch (Throwable $exception) {
                 error_log('SakayLokal welcome email failed for ' . $email . ': ' . $exception->getMessage());
             }
 
-            $this->respond(['data' => ['id' => $id, 'message' => 'Account created.']], 201);
+            $this->respond([
+                'data' => [
+                    'id' => $id,
+                    'message' => 'Account created.',
+                    'email_sent' => $emailSent,
+                ],
+            ], 201);
         }
 
         private function sendWelcomeEmail($email, $fullName)
         {
-            $host = getenv('SMTP_HOST') ?: '';
-            $username = getenv('SMTP_USERNAME') ?: '';
-            $password = getenv('SMTP_PASSWORD') ?: '';
-
-            if ($host === '' || $username === '' || $password === '') {
-                return;
-            }
-
             $this->call->library('Smtp_mailer');
             $subject = 'Welcome to SakayLokal';
             $safeName = htmlspecialchars($fullName ?: 'Passenger', ENT_QUOTES, 'UTF-8');

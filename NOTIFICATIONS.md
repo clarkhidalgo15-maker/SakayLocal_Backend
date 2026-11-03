@@ -5,16 +5,19 @@ Email subscriptions are opt-in and disabled by default. When creating an advisor
 ## Gmail SMTP
 
 1. Copy `.env.example` to `.env` if needed.
-2. Set `SMTP_USERNAME` to the sending Gmail address and `SMTP_FROM_EMAIL` to that same address.
+2. In Render's backend service environment, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USERNAME` to the sending Gmail address, and `SMTP_FROM_EMAIL` to that same address.
 3. Set `SMTP_PASSWORD` to a Google App Password. Do not use the normal Gmail password or commit `.env`.
-4. Run `composer install` in this directory and configure Apache/PHP to allow outbound SMTP on port 587.
+4. The Docker image installs PHPMailer from `composer.json` and loads Composer's autoloader when the backend starts.
 5. Log in to a passenger account and open **Account settings** to opt in to advisory and weather notifications.
+
+New passenger registrations receive a welcome email immediately. If delivery fails, account creation still succeeds, the API reports `email_sent: false`, and the backend logs the delivery error.
 
 The database schema is applied through the versioned `user_notifications_v3` migration on the first API request. Fresh database imports also include the required notification columns and tables in `../dbsql/sakaylokal.sql`.
 
 ## Scheduled worker
 
 The worker sends up to 25 queued messages each run. Schedule it to run once per minute so email backlogs are drained while weather checks remain rate-limited to 30 minutes.
+On Render, create a separate Cron Job using the backend repository and Docker environment, and run `php console/cli.php notifications:run` once per minute. Configure the same database and SMTP environment variables on the Cron Job as on the web service. Without this worker, advisory and weather notifications remain queued and are not emailed.
 
 From the `LavaLust` directory, the command is:
 
