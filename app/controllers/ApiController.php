@@ -235,8 +235,12 @@ class ApiController extends Controller
         $input = $this->apiLibrary()->body();
         if ($preservePassword) {
             $rawInput = json_decode(file_get_contents('php://input'), true);
-            if (is_array($rawInput) && is_string($rawInput['password'] ?? null)) {
-                $input['password'] = $rawInput['password'];
+            if (is_array($rawInput)) {
+                foreach (['password', 'current_password', 'new_password'] as $passwordField) {
+                    if (is_string($rawInput[$passwordField] ?? null)) {
+                        $input[$passwordField] = $rawInput[$passwordField];
+                    }
+                }
             }
         }
 

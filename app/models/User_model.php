@@ -70,13 +70,72 @@ class User_model extends Model
             ->update($fields);
     }
 
-    public function getAdminList()
+    public function updateAdminProfile($id, array $data)
     {
+        $fields = [
+            'full_name' => trim((string) $data['full_name']),
+            'email' => strtolower(trim((string) $data['email'])),
+            'phone' => $data['phone'] ?: null,
+        ];
+        if (array_key_exists('profile_photo', $data)) {
+            $fields['profile_photo'] = $data['profile_photo'];
+        }
+
         return $this->db->table($this->table)
-            ->select('user_id AS id, full_name, email, role, assigned_city, phone, is_active, created_at')
+            ->where($this->primary_key, (int) $id)
+            ->in('role', ['admin', 'staff'])
             ->where('is_active', 1)
-            ->order_by('created_at', 'DESC')
-            ->get_all();
+            ->update($fields);
+    }
+
+    public function updatePassword($id, $password, $administrator = false)
+    {
+        $query = $this->db->table($this->table)
+            ->where($this->primary_key, (int) $id)
+            ->where('is_active', 1);
+        if ($administrator) {
+            $query->in('role', ['admin', 'staff']);
+        } else {
+            $query->where('role', 'passenger');
+        }
+
+        return $query->update(['password_hash' => password_hash((string) $password, PASSWORD_DEFAULT)]) > 0;
+    }
+
+    public function getAdminList($role = null, $search = '')
+    {
+        $query = $this->db->table($this->table)
+            ->select('user_id AS id, full_name, email, role, assigned_city, phone, is_active, created_at')
+            ->where('is_active', 1);
+        if ($role !== null) {
+            $query->where('role', $role);
+        }
+
+        $users = $query->order_by('created_at', 'DESC')->get_all();
+        $search = trim((string) $search);
+        if ($search === '') {
+            return $users;
+        }
+
+        return array_values(array_filter($users, static function ($user) use ($search) {
+            foreach (['full_name', 'email', 'phone'] as $field) {
+                if (isset($user[$field]) && stripos((string) $user[$field], $search) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        }));
+    }
+
+    public function hasRole($id, $role)
+    {
+        $result = $this->db->table($this->table)
+            ->select_count('*', 'total')
+            ->where($this->primary_key, (int) $id)
+            ->where('role', $role)
+            ->get();
+
+        return (int) $result['total'] > 0;
     }
 
     public function cityExists($city)
@@ -89,19 +148,20 @@ class User_model extends Model
         return (int) $result['total'] > 0;
     }
 
-    public function saveAdmin($id, array $data)
+    public function saveAdmin($id, array $data, $role = null)
     {
+        $role = $role ?? $data['role'];
         $fields = [
             'full_name' => trim((string) $data['full_name']),
             'email' => trim((string) $data['email']),
-            'role' => $data['role'],
+            'role' => $role,
             'assigned_city' => $data['assigned_city'] ?? null,
             'phone' => $data['phone'] ?? null,
         ];
         if ($id > 0) {
             $this->db->table($this->table)
                 ->where($this->primary_key, (int) $id)
-                ->where('role', '<>', 'admin')
+                ->where('role', $role)
                 ->update($fields);
             return (int) $id;
         }
@@ -110,12 +170,15 @@ class User_model extends Model
         return $this->db->table($this->table)->insert($fields);
     }
 
-    public function deactivate($id, $protectAdmin = true)
+    public function deactivate($id, $protectAdmin = true, $role = null)
     {
         $query = $this->db->table($this->table)
             ->where($this->primary_key, (int) $id);
         if ($protectAdmin) {
             $query->where('role', '<>', 'admin');
+        }
+        if ($role !== null) {
+            $query->where('role', $role);
         }
 
         return $query->update(['is_active' => 0]) > 0;

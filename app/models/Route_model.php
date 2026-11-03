@@ -29,12 +29,15 @@ class Route_model extends Model
             ->get_all();
     }
 
-    public function getAdminList($city = null)
+    public function getAdminList($city = null, $workflowStatus = null)
     {
         $query = $this->db->table('routes r')
             ->select('r.route_id AS id, r.route_name AS name, r.vehicle_type AS vehicle, r.origin_name AS origin, r.destination_name AS destination, r.description, r.is_active, r.workflow_status, r.review_remarks')
             ->select_raw('MAX(CASE WHEN rt.stop_order = 1 THEN rt.terminal_id END) AS origin_terminal_id')
             ->select_raw('MAX(CASE WHEN rt.stop_order = 2 THEN rt.terminal_id END) AS destination_terminal_id');
+        if ($workflowStatus !== null) {
+            $query->where('r.workflow_status', $workflowStatus);
+        }
         if ($city !== null) {
             $query->join('route_terminals scope_rt', 'scope_rt.route_id = r.route_id')
                 ->join('terminals scope_t', 'scope_t.terminal_id = scope_rt.terminal_id')

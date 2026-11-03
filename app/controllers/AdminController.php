@@ -114,7 +114,8 @@ class AdminController extends ApiController
                 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     $this->call->model('Route_model');
                     $city = $user['role'] === 'staff' ? ($user['assigned_city'] ?? '') : null;
-                    $this->respond($this->pageMeta($this->Route_model->getAdminList($city)));
+                    $workflowStatus = ($_GET['workflow_status'] ?? '') === 'submitted' ? 'submitted' : null;
+                    $this->respond($this->pageMeta($this->Route_model->getAdminList($city, $workflowStatus)));
                 }
                 $data = $this->input();
                 if (($data['action'] ?? '') === 'permanent_delete') {
@@ -220,54 +221,85 @@ class AdminController extends ApiController
             }
 
     public function admin_users()
-            {
-                $this->requireSuperAdmin();
-                $db = $this->database();
-                if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-                    $this->call->model('User_model');
-                    $this->respond($this->pageMeta($this->User_model->getAdminList()));
-                }
-                $data = $this->input();
-                if (($data['action'] ?? '') === 'delete') {
-                    $id = (int) ($data['id'] ?? 0);
-                    if ($id < 1) $this->respond(['error' => 'User id is required.'], 422);
-                    $this->call->model('User_model');
-                    $this->respond(['data' => ['id' => $id, 'deleted' => $this->User_model->deactivate($id)]]);
-                }
-                $id = (int) ($_GET['id'] ?? $data['id'] ?? 0);
-                $this->required($data, ['full_name', 'email', 'role']);
-                if (!in_array($data['role'], ['staff', 'passenger'], true)) {
-                    $this->respond(['error' => 'Only staff or passenger accounts can be created here.'], 422);
-                }
-                $assignedCity = trim((string) ($data['assigned_city'] ?? ''));
-                if ($data['role'] === 'staff') {
-                    if ($assignedCity === '') {
-                        $this->respond(['error' => 'Select an assigned municipality/city for staff.'], 422);
-                    }
-                    $this->call->model('User_model');
-                    if (!$this->User_model->cityExists($assignedCity)) {
-                        $this->respond(['error' => 'Select a municipality/city from the areas list.'], 422);
-                    }
-                } else {
-                    $assignedCity = null;
-                }
-                if ($id < 1) {
-                    $this->required($data, ['password']);
-                }
-                $this->call->model('User_model');
-                $data['assigned_city'] = $assignedCity;
-                $this->respond(['data' => ['id' => $this->User_model->saveAdmin($id, $data)]]);
-            }
+    {
+        $this->requireSuperAdmin();
+        $this->database();
+        $this->call->model('User_model');
 
-    public function delete_user()
-            {
-                $this->requireSuperAdmin();
-                $id = (int) ($_GET['id'] ?? 0);
-                if ($id < 1) $this->respond(['error' => 'User id is required.'], 422);
-                $this->database();
-                $this->call->model('User_model');
-                $this->respond(['data' => ['id' => $id, 'deleted' => $this->User_model->deactivate($id, false)]]);
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->respond(['error' => 'Passenger accounts are read-only in admin.'], 405);
+        }
+
+        $search = trim((string) ($_GET['search'] ?? ''));
+        $this->respond($this->pageMeta($this->User_model->getAdminList('passenger', $search)));
+    }
+
+    public function admin_staff()
+    {
+        $this->manageAccountsByRole('staff');
+    }
+
+    private function manageAccountsByRole($role)
+    {
+        $this->requireSuperAdmin();
+        $this->database();
+        $this->call->model('User_model');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $this->respond($this->pageMeta($this->User_model->getAdminList($role)));
+        }
+
+        $data = $this->input();
+        if (($data['action'] ?? '') === 'delete') {
+            $id = (int) ($data['id'] ?? 0);
+            if ($id < 1) $this->respond(['error' => 'User id is required.'], 422);
+            $this->respond(['data' => ['id' => $id, 'deleted' => $this->User_model->deactivate($id, true, $role)]]);
+        }
+
+        $id = (int) ($_GET['id'] ?? $data['id'] ?? 0);
+        $this->required($data, ['full_name', 'email']);
+        if ($id > 0 && !$this->User_model->hasRole($id, $role)) {
+            $this->respond(['error' => 'Account not found in this account group.'], 404);
+        }
+        if ($id < 1) {
+            $this->required($data, ['password']);
+            $password = is_string($data['password'] ?? null) ? $data['password'] : '';
+            if (strlen($password) < 6 || strlen($password) > 255) {
+                $this->respond(['error' => 'Password must be between 6 and 255 characters.'], 422);
             }
+        }
+
+        if ($role === 'staff') {
+            $assignedCity = trim((string) ($data['assigned_city'] ?? ''));
+            if ($assignedCity === '') {
+                $this->respond(['error' => 'Select an assigned municipality/city for staff.'], 422);
+            }
+            if (!$this->User_model->cityExists($assignedCity)) {
+                $this->respond(['error' => 'Select a municipality/city from the areas list.'], 422);
+            }
+        } else {
+            $assignedCity = null;
+        }
+
+        $data['assigned_city'] = $assignedCity;
+        try {
+            $savedId = $this->User_model->saveAdmin($id, $data, $role);
+        } catch (PDOException $exception) {
+            $databaseError = $exception->getMessage();
+            if ($exception->getCode() === '23000' || strpos($databaseError, '23000') !== false || stripos($databaseError, 'duplicate entry') !== false) {
+                $this->respond(['error' => 'That email is already in use.'], 409);
+            }
+            error_log('SakayLokal admin account save failed: ' . $databaseError);
+            $this->respond(['error' => 'Could not save this account. Check the account details and try again.'], 500);
+        } catch (Throwable $exception) {
+            error_log('SakayLokal admin account save failed: ' . $exception->getMessage());
+            $this->respond(['error' => 'Could not save this account. Please try again.'], 500);
+        }
+        if (!$savedId) {
+            $this->respond(['error' => 'Could not save this account. Please try again.'], 500);
+        }
+        $this->respond(['data' => ['id' => (int) $savedId]]);
+    }
 
     public function admin_fares()
             {
