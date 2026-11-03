@@ -26,15 +26,20 @@ class Smtp_mailer
 
     public function send($recipient, $subject, $message)
     {
-        $host = $this->envValue('SMTP_HOST');
-        $username = $this->envValue('SMTP_USERNAME');
+        $fromEmail = $this->envValue('SMTP_FROM_EMAIL');
+        $username = $this->envValue('SMTP_USERNAME', $fromEmail);
+        $host = $this->envValue('SMTP_HOST', 'smtp.gmail.com');
         $password = $this->envValue('SMTP_PASSWORD');
         $port = (int) $this->envValue('SMTP_PORT', '587');
-        $fromEmail = $this->envValue('SMTP_FROM_EMAIL', $username);
+        $fromEmail = $fromEmail !== '' ? $fromEmail : $username;
         $fromName = $this->envValue('SMTP_FROM_NAME', 'SakayLokal');
 
         if ($host === '' || $username === '' || $password === '' || $fromEmail === '') {
-            throw new RuntimeException('Email delivery is not configured. Set the SMTP values in the server .env file.');
+            throw new RuntimeException('Email delivery is not configured. Set SMTP_FROM_EMAIL and SMTP_PASSWORD in the server environment.');
+        }
+
+        if (strtolower($host) === 'smtp.gmail.com') {
+            $password = preg_replace('/\s+/', '', $password);
         }
 
         if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {

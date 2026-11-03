@@ -5,8 +5,8 @@ Email subscriptions are opt-in and disabled by default. When creating an advisor
 ## Gmail SMTP
 
 1. Copy `.env.example` to `.env` if needed.
-2. In Render's backend service environment, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USERNAME` to the sending Gmail address, and `SMTP_FROM_EMAIL` to that same address.
-3. Set `SMTP_PASSWORD` to a Google App Password. Do not use the normal Gmail password or commit `.env`.
+2. In Render's backend service environment, set `SMTP_FROM_EMAIL` to the sending Gmail address and `SMTP_PASSWORD` to its Google App Password. Do not use the normal Gmail password or commit `.env`.
+3. Gmail host, port 587, and username default to `smtp.gmail.com`, `587`, and `SMTP_FROM_EMAIL`; set `SMTP_HOST`, `SMTP_PORT`, or `SMTP_USERNAME` only if you need to override these defaults.
 4. The Docker image installs PHPMailer from `composer.json` and loads Composer's autoloader when the backend starts.
 5. Log in to a passenger account and open **Account settings** to opt in to advisory and weather notifications.
 
