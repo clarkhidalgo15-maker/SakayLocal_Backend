@@ -1,13 +1,12 @@
 ARG PHP_VERSION=8.5
- 
+
+FROM composer:2 AS dependencies
+
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
+
 FROM php:${PHP_VERSION}-apache
-
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-WORKDIR /var/www/html
-
-COPY composer.json ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
  
 # Install PDO MySQL
 RUN docker-php-ext-install pdo pdo_mysql
@@ -20,6 +19,7 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/Allo
  
 # Copy app files
 COPY . /var/www/html/
+COPY --from=dependencies /app/vendor/ /var/www/html/vendor/
  
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html \
