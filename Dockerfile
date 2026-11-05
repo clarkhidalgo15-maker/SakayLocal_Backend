@@ -25,7 +25,7 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/Allo
 # Copy app files
 COPY . /var/www/html/
 COPY --from=dependencies /app/vendor/ /var/www/html/vendor/
-COPY scripts/supervisord.conf /etc/supervisor/conf.d/sakaylokal.conf
+COPY scripts/supervisord.conf /etc/supervisor/supervisord.conf
  
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html \
@@ -39,4 +39,4 @@ RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot ${APACHE_DOCUMENT_ROOT}|g'
  
 EXPOSE 80
 
-CMD ["supervisord", "-n"]
+CMD ["supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
