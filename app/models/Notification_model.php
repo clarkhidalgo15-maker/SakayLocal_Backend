@@ -12,7 +12,7 @@ class Notification_model extends Model
             ? ['passenger', 'staff']
             : [$audience === 'staff' ? 'staff' : 'passenger'];
         $rolePlaceholders = implode(',', array_fill(0, count($roles), '?'));
-        $this->execute(
+        $statement = $this->execute(
             "INSERT IGNORE INTO email_notifications (user_id, event_key, subject, message)
              SELECT user_id, ?, ?, ? FROM users
              WHERE is_active = 1 AND notify_advisories = 1 AND email <> ''
@@ -22,6 +22,7 @@ class Notification_model extends Model
                 $roles
             )
         );
+        return $statement->rowCount();
     }
 
     public function queueWeather($eventKey, $subject, $message)
@@ -42,24 +43,6 @@ class Notification_model extends Model
              WHERE status = 'pending' AND attempts < 5
              ORDER BY created_at, notification_id
              LIMIT {$limit}"
-        )->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function pendingForAdvisory($id)
-    {
-        $eventKey = 'advisory-' . (int) $id;
-        $this->execute(
-            "UPDATE email_notifications SET status = 'pending'
-             WHERE event_key = ? AND status = 'sending' AND updated_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)",
-            [$eventKey]
-        );
-        return $this->execute(
-            "SELECT n.notification_id, n.user_id, n.subject, n.message, n.attempts, u.email, u.is_active
-             FROM email_notifications n
-             LEFT JOIN users u ON u.user_id = n.user_id
-             WHERE n.event_key = ? AND n.status = 'pending' AND n.attempts < 5
-             ORDER BY n.created_at, n.notification_id",
-            [$eventKey]
         )->fetchAll(PDO::FETCH_ASSOC);
     }
 

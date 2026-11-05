@@ -382,13 +382,13 @@ class AdminController extends ApiController
                         $published = $advisory->fetch(PDO::FETCH_ASSOC);
                         if ($published) {
                             $this->call->model('Notification_model');
-                            $this->Notification_model->queueAdvisory(
+                            $queued = $this->Notification_model->queueAdvisory(
                                 $id,
                                 $published['title'],
                                 $published['body'],
                                 $published['recipient_audience']
                             );
-                            $emailDelivery = $this->deliverAdvisoryNotifications($id);
+                            $emailDelivery = ['queued' => $queued];
                         }
                     }
                     $response = ['id' => $id, 'workflow_status' => $status];
@@ -416,8 +416,8 @@ class AdminController extends ApiController
                 );
                 if ($user['role'] === 'admin') {
                     $this->call->model('Notification_model');
-                    $this->Notification_model->queueAdvisory($id, $title, $body, $audience);
-                    $emailDelivery = $this->deliverAdvisoryNotifications($id);
+                    $queued = $this->Notification_model->queueAdvisory($id, $title, $body, $audience);
+                    $emailDelivery = ['queued' => $queued];
                 }
                 $response = ['id' => $id];
                 if ($emailDelivery !== null) {
@@ -425,42 +425,6 @@ class AdminController extends ApiController
                 }
                 $this->respond(['data' => $response]);
             }
-
-    private function deliverAdvisoryNotifications($id)
-    {
-        $notifications = $this->Notification_model->pendingForAdvisory($id);
-        $this->call->library('Smtp_mailer');
-        $sent = 0;
-        $failed = 0;
-
-        foreach ($notifications as $notification) {
-            if (!$this->Notification_model->markSending($notification['notification_id'])) {
-                continue;
-            }
-            if (empty($notification['is_active']) || empty($notification['email'])) {
-                $error = 'Subscriber no longer exists or is inactive.';
-                $this->Notification_model->markFailedAttempt($notification['notification_id'], $notification['attempts'], $error);
-                error_log('SakayLokal advisory email delivery failed: ' . $error);
-                $failed++;
-                continue;
-            }
-            try {
-                $this->Smtp_mailer->send($notification['email'], $notification['subject'], $notification['message']);
-                $this->Notification_model->markSent($notification['notification_id']);
-                $sent++;
-            } catch (Throwable $exception) {
-                error_log('SakayLokal advisory email delivery failed: ' . $exception->getMessage());
-                $this->Notification_model->markFailedAttempt(
-                    $notification['notification_id'],
-                    $notification['attempts'],
-                    $exception->getMessage()
-                );
-                $failed++;
-            }
-        }
-
-        return ['queued' => count($notifications), 'sent' => $sent, 'failed' => $failed];
-    }
 
     public function admin_schedules()
             {

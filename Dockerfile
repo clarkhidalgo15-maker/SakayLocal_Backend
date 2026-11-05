@@ -10,6 +10,11 @@ FROM php:${PHP_VERSION}-apache
  
 # Install PDO MySQL
 RUN docker-php-ext-install pdo pdo_mysql
+
+# Run Apache and the notification queue worker in the same Render service
+RUN apt-get update \
+&& apt-get install -y --no-install-recommends supervisor \
+&& rm -rf /var/lib/apt/lists/*
  
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
@@ -20,6 +25,7 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/Allo
 # Copy app files
 COPY . /var/www/html/
 COPY --from=dependencies /app/vendor/ /var/www/html/vendor/
+COPY scripts/supervisord.conf /etc/supervisor/conf.d/sakaylokal.conf
  
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html \
@@ -32,3 +38,5 @@ RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot ${APACHE_DOCUMENT_ROOT}|g'
 && sed -i 's|<Directory /var/www/html>|<Directory ${APACHE_DOCUMENT_ROOT}>|g' /etc/apache2/apache2.conf
  
 EXPOSE 80
+
+CMD ["supervisord", "-n"]
