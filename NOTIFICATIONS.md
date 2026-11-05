@@ -4,9 +4,9 @@ Email subscriptions are opt-in and disabled by default. When creating an advisor
 
 ## Email delivery without a Cron Job
 
-Email is sent through the Resend HTTPS API. Create a Resend account, add and verify a domain you own, then create an API key in the Resend dashboard. In the Render backend web service, configure `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (an address at the verified domain), and optionally `RESEND_FROM_NAME`. Remove the old `SMTP_*` variables. Do not put the API key in frontend code or commit it. Resend must accept the sender domain before emails can be sent to arbitrary users.
+Email is sent through PHPMailer over SMTP. In the Render backend web service, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and optionally `SMTP_FROM_NAME`. For Gmail, use `smtp.gmail.com`, port `465` or `587`, and a Google App Password (not your normal Gmail password); use the Gmail address for both `SMTP_USERNAME` and `SMTP_FROM_EMAIL`.
 
-The static frontend cannot run PHP or send email by itself. Keep the PHP backend web service deployed and set its Resend environment variables. HTTPS API requests do not use SMTP ports. If sending fails, inspect backend logs for the Resend error. The admin publish response reports how many email notifications were queued; the background worker sends them after the API response. Users must opt in to advisory emails in Account settings.
+The static frontend cannot run PHP or send email by itself. Keep the PHP backend web service deployed and set its SMTP environment variables. If sending fails, inspect backend logs for PHPMailer’s SMTP error. The admin publish response reports how many email notifications were queued; the background worker sends them after the API response. Users must opt in to advisory emails in Account settings.
 
 New passenger registrations receive a welcome email immediately. If delivery fails, account creation still succeeds, the API reports `email_sent: false`, and the backend logs the delivery error.
 

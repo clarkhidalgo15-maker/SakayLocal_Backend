@@ -18,7 +18,7 @@ class NotificationController extends ApiController
             error_log('SakayLokal weather check failed: ' . $exception->getMessage());
             $weatherQueued = 0;
         }
-        $this->call->library('Email_sender');
+        $this->call->library('Smtp_mailer');
         $sent = 0;
         $failed = 0;
         foreach ($this->Notification_model->pending(25) as $notification) {
@@ -38,12 +38,7 @@ class NotificationController extends ApiController
                 continue;
             }
             try {
-                $this->Email_sender->send(
-                    $recipient['email'],
-                    $notification['subject'],
-                    $notification['message'],
-                    'sakaylokal-notification-' . $notification['notification_id']
-                );
+                $this->Smtp_mailer->send($recipient['email'], $notification['subject'], $notification['message']);
                 $this->Notification_model->markSent($notification['notification_id']);
                 $sent++;
             } catch (Throwable $exception) {
