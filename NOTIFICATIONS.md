@@ -4,14 +4,9 @@ Email subscriptions are opt-in and disabled by default. When creating an advisor
 
 ## Email delivery on Render
 
-The preferred delivery method is the Resend HTTPS API. This avoids SMTP connection failures on hosting platforms that restrict outbound SMTP.
+Email is sent through PHPMailer over SMTP. In the backend web service and the notification Cron Job, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME`. For Gmail, use `smtp.gmail.com`, port `587`, and a Google App Password (not the normal Gmail password); use the Gmail address for both `SMTP_USERNAME` and `SMTP_FROM_EMAIL`.
 
-1. Create a Resend account, add and verify a sender domain, and create an API key.
-2. In the Render backend service environment, set `RESEND_API_KEY` to the API key and `RESEND_FROM_EMAIL` to an email address on the verified domain. Do not use a Gmail address as the sender unless Resend explicitly verifies it.
-3. Redeploy the backend and register with an email address you can access. The API reports `email_sent: true` only when Resend accepts the message; if delivery fails, inspect the backend logs.
-4. The Docker image loads PHPMailer for optional SMTP fallback. When `RESEND_API_KEY` is set, all welcome and queued notification emails use the Resend HTTPS API instead.
-
-For local development or an SMTP provider that permits outbound SMTP, configure `SMTP_FROM_EMAIL` and `SMTP_PASSWORD`. Gmail SMTP also defaults to host `smtp.gmail.com`, port `587`, and username `SMTP_FROM_EMAIL`. Use a Google App Password, never the regular Gmail password, and do not commit secrets.
+Render must allow outbound connections to the selected SMTP host and port. If sending fails, inspect the backend or Cron Job logs for PHPMailer’s SMTP error. The API reports `email_sent: false` for failed welcome email attempts; queued notifications are retried up to five times.
 
 New passenger registrations receive a welcome email immediately. If delivery fails, account creation still succeeds, the API reports `email_sent: false`, and the backend logs the delivery error.
 
@@ -22,7 +17,7 @@ The database schema is applied through the versioned `user_notifications_v3` mig
 ## Scheduled worker
 
 The worker sends up to 25 queued messages each run. Schedule it to run once per minute so email backlogs are drained while weather checks remain rate-limited to 30 minutes.
-On Render, create a separate Cron Job using the backend repository and Docker environment, and run `php console/cli.php notifications:run` once per minute. Configure the same database and email environment variables on the Cron Job as on the web service. Without this worker, advisory and weather notifications remain queued and are not emailed.
+The backend `render.yaml` defines a `sakaylocal-notifications` Cron Job that runs `php /var/www/html/console/cli.php notifications:run` once per minute. When syncing the Render Blueprint, set its database, JWT, and SMTP environment variables to match the backend service. Without this worker, advisory and weather notifications remain queued and are not emailed, even if SMTP is configured correctly.
 
 From the `LavaLust` directory, the command is:
 
