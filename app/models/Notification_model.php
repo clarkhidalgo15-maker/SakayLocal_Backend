@@ -12,17 +12,24 @@ class Notification_model extends Model
             ? ['passenger', 'staff']
             : [$audience === 'staff' ? 'staff' : 'passenger'];
         $rolePlaceholders = implode(',', array_fill(0, count($roles), '?'));
+        $eventKey = 'advisory-' . (int) $id;
+        $retried = $this->execute(
+            "UPDATE email_notifications
+             SET status = 'pending', attempts = 0, last_error = NULL
+             WHERE event_key = ? AND status = 'failed'",
+            [$eventKey]
+        )->rowCount();
         $statement = $this->execute(
             "INSERT IGNORE INTO email_notifications (user_id, event_key, subject, message)
              SELECT user_id, ?, ?, ? FROM users
              WHERE is_active = 1 AND notify_advisories = 1 AND email <> ''
                AND role IN ({$rolePlaceholders})",
             array_merge(
-                ['advisory-' . (int) $id, 'SakayLokal public advisory: ' . $title, $body],
+                [$eventKey, 'SakayLokal public advisory: ' . $title, $body],
                 $roles
             )
         );
-        return $statement->rowCount();
+        return $retried + $statement->rowCount();
     }
 
     public function queueWeather($eventKey, $subject, $message)

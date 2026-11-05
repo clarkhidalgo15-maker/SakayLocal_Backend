@@ -4,9 +4,9 @@ Email subscriptions are opt-in and disabled by default. When creating an advisor
 
 ## Email delivery without a Cron Job
 
-Email is sent through PHPMailer over SMTP. Welcome emails are sent during account registration. Advisory/announcement emails are queued during the admin publish request and picked up by a background worker running inside the same PHP backend container; this does not need a separate Cron Job. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME` on the backend web service. For Gmail, use `smtp.gmail.com`, port `587`, and a Google App Password (not the normal Gmail password); use the Gmail address for both `SMTP_USERNAME` and `SMTP_FROM_EMAIL`.
+Email is sent through the Resend HTTPS API. Create a Resend account, add and verify a domain you own, then create an API key in the Resend dashboard. In the Render backend web service, configure `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (an address at the verified domain), and optionally `RESEND_FROM_NAME`. Remove the old `SMTP_*` variables. Do not put the API key in frontend code or commit it. Resend must accept the sender domain before emails can be sent to arbitrary users.
 
-The static frontend cannot run PHP or send email by itself. Keep the PHP backend web service deployed and set its SMTP environment variables. Render must also allow outbound connections to the SMTP host and port. If sending fails, inspect backend logs for PHPMailer’s SMTP error. The admin publish response reports how many email notifications were queued; the background worker sends them after the API response. Users must opt in to advisory emails in Account settings.
+The static frontend cannot run PHP or send email by itself. Keep the PHP backend web service deployed and set its Resend environment variables. HTTPS API requests do not use SMTP ports. If sending fails, inspect backend logs for the Resend error. The admin publish response reports how many email notifications were queued; the background worker sends them after the API response. Users must opt in to advisory emails in Account settings.
 
 New passenger registrations receive a welcome email immediately. If delivery fails, account creation still succeeds, the API reports `email_sent: false`, and the backend logs the delivery error.
 
@@ -24,4 +24,4 @@ To run a one-off check manually from the `LavaLust` directory:
 php console/cli.php notifications:run
 ```
 
-Check the PHP/server error log for delivery failures. A message is retried up to five times, then marked failed.
+Check the PHP/server error log for delivery failures. A message is retried up to five times, then marked failed. Publishing the same advisory again resets its failed email deliveries for another attempt.

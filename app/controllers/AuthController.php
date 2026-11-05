@@ -76,7 +76,7 @@ class AuthController extends ApiController
 
         private function sendWelcomeEmail($email, $fullName)
         {
-            $this->call->library('Smtp_mailer');
+            $this->call->library('Email_sender');
             $subject = 'Welcome to SakayLokal';
             $safeName = htmlspecialchars($fullName ?: 'Passenger', ENT_QUOTES, 'UTF-8');
             $message = "<p>Hi {$safeName},</p>"
@@ -84,7 +84,7 @@ class AuthController extends ApiController
                 . "<p>You can now log in to find terminals, routes, fares, and submit reports.</p>"
                 . "<p>Thank you for joining the SakayLokal community.</p>";
 
-            $this->Smtp_mailer->send($email, $subject, $message);
+            $this->Email_sender->send($email, $subject, $message);
         }
 
 }
