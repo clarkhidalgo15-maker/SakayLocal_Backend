@@ -5,6 +5,15 @@ require_once __DIR__ . '/ApiController.php';
 
 class AdminController extends ApiController
 {
+    public function admin_dashboard()
+    {
+        $user = $this->requireAdmin();
+        $this->database();
+        $this->call->model('Passenger_report_model');
+        $city = $user['role'] === 'staff' ? ($user['assigned_city'] ?? '') : null;
+        $this->respond(['data' => $this->Passenger_report_model->getDashboardSummary($city)]);
+    }
+
     public function admin_reports()
             {
                 $user = $this->requireAdmin();
