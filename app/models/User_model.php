@@ -41,6 +41,17 @@ class User_model extends Model
         ]);
     }
 
+    public function createWithPasswordHash(array $data)
+    {
+        return $this->db->table($this->table)->insert([
+            'full_name' => trim((string) $data['full_name']),
+            'email' => strtolower(trim((string) $data['email'])),
+            'password_hash' => (string) $data['password_hash'],
+            'role' => 'passenger',
+            'phone' => $data['phone'] ?? null,
+        ]);
+    }
+
     public function findActiveById($id)
     {
         return $this->db->table($this->table)
